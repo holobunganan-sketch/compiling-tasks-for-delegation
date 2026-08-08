@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Validate example packages
+        run: |
+          python scripts/validate_execution_pack.py examples/simple
+          python scripts/validate_execution_pack.py examples/complex
+      - name: Check production files for unresolved placeholders
+        run: |
+          if grep -RniE '\b(TODO|TBD|FIXME|XXX)\b' SKILL.md agents references README.md VERSION CHANGELOG.md RELEASE_NOTES.md; then
+            echo "Unresolved placeholder found in production files"
+            exit 1
+          fi

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Delegation Compiler"
+  short_description: "Compile complex work into deterministic executor packs"
+  default_prompt: "Use $compiling-tasks-for-delegation to compile this task into a deterministic execution package for a lower-capability model."

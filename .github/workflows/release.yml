@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - VERSION
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify before release
+        run: |
+          python -m unittest discover -s tests -v
+          python scripts/validate_execution_pack.py examples/simple
+          python scripts/validate_execution_pack.py examples/complex
+
+      - name: Build installable ZIP
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          TAG="v${VERSION}"
+          ARCHIVE="compiling-tasks-for-delegation-${TAG}.zip"
+          CHECKSUM="${ARCHIVE}.sha256"
+          STAGE="${RUNNER_TEMP}/compiling-tasks-for-delegation"
+          rm -rf "${STAGE}"
+          mkdir -p "${STAGE}"
+          rsync -a ./ "${STAGE}/" \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'tests/' \
+            --exclude 'evals/' \
+            --exclude 'docs/' \
+            --exclude 'examples/' \
+            --exclude 'dist/' \
+            --exclude '*.zip' \
+            --exclude '*.sha256'
+          (cd "${RUNNER_TEMP}" && zip -qr "${GITHUB_WORKSPACE}/${ARCHIVE}" compiling-tasks-for-delegation)
+          sha256sum "${ARCHIVE}" > "${CHECKSUM}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "archive=${ARCHIVE}" >> "${GITHUB_OUTPUT}"
+          echo "checksum=${CHECKSUM}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create tag if needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.package.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            TAG_SHA="$(git rev-list -n 1 "${TAG}")"
+            if [ "${TAG_SHA}" != "${GITHUB_SHA}" ]; then
+              echo "Tag ${TAG} already points to ${TAG_SHA}, expected ${GITHUB_SHA}."
+              exit 1
+            fi
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${TAG}" -m "${TAG}"
+            git push origin "${TAG}"
+          fi
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.package.outputs.tag }}"
+          ARCHIVE="${{ steps.package.outputs.archive }}"
+          CHECKSUM="${{ steps.package.outputs.checksum }}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${ARCHIVE}" "${CHECKSUM}" --clobber
+          else
+            gh release create "${TAG}" "${ARCHIVE}" "${CHECKSUM}" \
+              --title "${TAG}" \
+              --notes-file RELEASE_NOTES.md \
+              --verify-tag
+          fi
