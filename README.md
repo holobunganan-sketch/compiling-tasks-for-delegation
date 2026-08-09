@@ -29,7 +29,59 @@ Skill 会强制建立以下控制层：
 8. **编译器自审**：交付前模拟低能力执行者逐步运行整个计划。
 9. **机械校验**：内置 Python 校验器检查执行包结构。
 
+## GPT-5.3-Codex-Spark 特例
+
+当用户明确指定任务最终交给 `GPT-5.3-Codex-Spark` 执行时，Skill 会进入 `SPARK_EXECUTION_MODE`。`Codex`、`小模型`、`快速模型` 等泛称不会触发该模式。
+
+OpenAI 将 Codex-Spark 定位为 Codex 中面向实时协作、定向修改和快速迭代的模型，并说明其默认工作风格较轻量，除非明确要求，否则不会自动运行测试。OpenAI 发布时记录的规格为 128k 上下文、text-only。Skill 因此采用保守的上下文预算和强制验证机制，不把最大上下文当作单次任务的填充目标。
+
+Spark 模式固定生成分片执行包：
+
+```text
+spark-execution-package/
+├── TASK.md
+├── CONTEXT.md
+├── SPARK_MASTER_INDEX.md
+├── ACCEPTANCE.md
+├── EXECUTION_REPORT.md
+└── chunks/
+    ├── CHUNK-001.md
+    ├── CHUNK-002.md
+    └── ...
+```
+
+每个 Chunk 默认遵守：
+
+- 1 个主要结果；
+- 最多 6 个原子步骤；
+- 默认最多 3 个主要文件/资源；
+- 当前 Chunk 加明确要求的上下文，编译目标不超过约 12,000 input tokens；
+- 必须写出并实际执行 `Mandatory Verification`；
+- 完成当前 Chunk 后立即停止；
+- 成功状态下先汇报修改、验证和证据，再询问用户是否进入下一 Chunk；
+- 未获得用户明确同意，不得预读、执行或部分开始下一 Chunk；
+- `BLOCKED`、`FAILED`、`HIGH_MODEL_REQUIRED` 状态只汇报和升级，不进入下一 Chunk。
+
+推荐调用方式：
+
+```text
+使用 $compiling-tasks-for-delegation。
+这个任务最终要交给 GPT-5.3-Codex-Spark 执行。
+请使用 Spark 专用分片执行协议编译以下任务：
+<任务内容>
+```
+
+Spark 专用规则见 `references/gpt-5.3-codex-spark-profile.md`。
+
+OpenAI 官方资料：
+
+- https://openai.com/index/introducing-gpt-5-3-codex-spark/
+
 ## 输出模式
+
+### GPT-5.3-Codex-Spark 任务
+
+始终生成 Spark 分片目录式执行包。
 
 ### 简单任务
 
@@ -106,6 +158,7 @@ Skill 会根据复杂度选择单文件或目录式执行包。
 │   ├── compiler-protocol.md
 │   ├── delegation-policy.md
 │   ├── task-taxonomy.md
+│   ├── gpt-5.3-codex-spark-profile.md
 │   ├── environment-adaptation.md
 │   ├── execution-step-spec.md
 │   ├── evidence-policy.md
@@ -117,7 +170,14 @@ Skill 会根据复杂度选择单文件或目录式执行包。
 │   ├── CONTEXT.md
 │   ├── STEPS.md
 │   ├── ACCEPTANCE.md
-│   └── EXECUTION_REPORT.md
+│   ├── EXECUTION_REPORT.md
+│   └── spark/
+│       ├── TASK.md
+│       ├── CONTEXT.md
+│       ├── SPARK_MASTER_INDEX.md
+│       ├── CHUNK.md
+│       ├── ACCEPTANCE.md
+│       └── EXECUTION_REPORT.md
 ├── scripts/
 │   └── validate_execution_pack.py
 ├── examples/
@@ -147,13 +207,13 @@ python scripts/validate_execution_pack.py /path/to/execution-package --json
 
 ## 设计边界
 
-这个 Skill 负责任务编译和执行资格控制。它不会自动把某一步交给特定模型，也不会替代模型路由器。你可以把生成的执行包交给任意较低等级的模型、Agent 或后续会话。
+这个 Skill 负责任务编译和执行资格控制。它不会自动调度模型，也不会替代模型路由器。用户明确指定 GPT-5.3-Codex-Spark 时，它会针对该执行模型生成专用执行包；其他任务仍可交给任意较低等级的模型、Agent 或后续会话。
 
 当执行现场出现计划没有覆盖的重大分支时，执行模型应停止并返回 Stop Code，由更高能力模型重新编译受影响部分。
 
 ## 版本
 
-当前版本：`v1.0.0`
+当前版本：`v1.1.0`
 
 ## License
 
