@@ -1,0 +1,76 @@
+name: Verify v1.1.0 Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-v1.1-release.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build release assets from v1.1.0 tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v1.1.0"
+          ARCHIVE="compiling-tasks-for-delegation-${TAG}.zip"
+          CHECKSUM="${ARCHIVE}.sha256"
+          SOURCE="${RUNNER_TEMP}/tagged-source"
+          STAGE="${RUNNER_TEMP}/package/compiling-tasks-for-delegation"
+
+          git fetch --tags --force
+          git worktree add --detach "${SOURCE}" "${TAG}"
+          rm -rf "${RUNNER_TEMP}/package"
+          mkdir -p "${STAGE}"
+          rsync -a "${SOURCE}/" "${STAGE}/" \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'tests/' \
+            --exclude 'evals/' \
+            --exclude 'docs/' \
+            --exclude 'examples/' \
+            --exclude 'dist/' \
+            --exclude '*.zip' \
+            --exclude '*.sha256'
+          (cd "${RUNNER_TEMP}/package" && zip -qr "${GITHUB_WORKSPACE}/${ARCHIVE}" compiling-tasks-for-delegation)
+          sha256sum "${ARCHIVE}" > "${CHECKSUM}"
+
+      - name: Ensure GitHub Release and assets exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v1.1.0"
+          ARCHIVE="compiling-tasks-for-delegation-${TAG}.zip"
+          CHECKSUM="${ARCHIVE}.sha256"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${ARCHIVE}" "${CHECKSUM}" --clobber
+          else
+            gh release create "${TAG}" "${ARCHIVE}" "${CHECKSUM}" \
+              --title "${TAG}" \
+              --notes-file RELEASE_NOTES.md \
+              --verify-tag
+          fi
+
+          ASSETS="$(gh release view "${TAG}" --json assets --jq '.assets[].name')"
+          grep -Fx "${ARCHIVE}" <<<"${ASSETS}"
+          grep -Fx "${CHECKSUM}" <<<"${ASSETS}"
+          test "$(gh release view "${TAG}" --json isDraft --jq '.isDraft')" = "false"
+
+      - name: Publish verification branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMMIT="$(git rev-list -n 1 v1.1.0)"
+          git push origin "${COMMIT}:refs/heads/release-verified-v1.1.0"
