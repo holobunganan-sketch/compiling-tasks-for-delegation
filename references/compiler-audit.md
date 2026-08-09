@@ -46,6 +46,21 @@ Starting at STEP 01, simulate each possible defined result. At every point ask:
 
 If any answer is no, repair the package. Do not hand it off.
 
+## GPT-5.3-Codex-Spark audit
+
+Apply this section whenever `SPARK_EXECUTION_MODE` is active.
+
+- The target executor is explicitly `GPT-5.3-Codex-Spark`.
+- The package uses `SPARK_MASTER_INDEX.md` plus `chunks/CHUNK-NNN.md`; it does not use a monolithic Spark execution plan.
+- Each chunk has one primary outcome, no more than 6 atomic steps, and no more than 3 primary files/resources by default.
+- The active chunk plus required context targets <= 12,000 input tokens and preserves headroom for tool output and verification.
+- Every chunk names an explicit mandatory verification action.
+- Every chunk contains `USER_APPROVAL_REQUIRED` and `AUTO_CONTINUE_FORBIDDEN`.
+- A successful non-final chunk stops, reports evidence, and asks the user whether to begin the named next chunk.
+- A blocked or failed chunk stops without offering progression to the next chunk.
+- Later chunks can rely only on durable outputs recorded by completed chunks.
+- The executor is never instructed to preload later chunks.
+
 ## Mechanical validation
 
 When the package exists as files, run:

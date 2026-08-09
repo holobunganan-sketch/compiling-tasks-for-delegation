@@ -1,6 +1,6 @@
 ---
 name: compiling-tasks-for-delegation
-description: Use when a task will be delegated to a less capable model and execution reliability depends on explicit constraints, bounded decisions, verifiable steps, environment-specific instructions, or safe escalation.
+description: Use when a task will be delegated to a less capable model, including explicit GPT-5.3-Codex-Spark handoffs, and execution reliability depends on bounded decisions, verifiable steps, environment-specific instructions, or safe escalation.
 ---
 
 # Compiling Tasks for Delegation
@@ -15,15 +15,17 @@ Do the reasoning before delegation. Produce an execution package in which the ex
 2. Decide whether live context can change the plan. If yes, inspect the relevant files, repository state, tools, environment, permissions, connected sources, or current artifacts before compiling. Read `references/compiler-protocol.md`.
 3. Classify the task and choose domain-specific evidence. Read `references/task-taxonomy.md` when the task is more than trivial.
 4. Classify every executable unit as `SAFE_TO_DELEGATE`, `CONDITIONAL`, or `HIGH_MODEL_REQUIRED`. Apply `references/delegation-policy.md` strictly.
-5. Build the platform-independent task contract first. Then adapt it to the current execution environment using `references/environment-adaptation.md`.
-6. Decompose work into atomic steps. Every verifiable step must contain Purpose, Input, Action, Expected Result, Evidence, Verdict, and Exception Handling. Follow `references/execution-step-spec.md`.
-7. Define explicit failure branches and stop codes from `references/stop-codes.md`. An uncovered material branch must stop and escalate; the executor must not improvise.
-8. Define acceptance criteria before finalizing the package. Evidence must prove completion according to `references/evidence-policy.md`.
-9. Choose output mode:
-   - Simple, linear task: instantiate `templates/EXECUTION_PLAN.md`.
-   - Complex, multi-phase, multi-artifact, or stateful task: instantiate `templates/TASK.md`, `CONTEXT.md`, `STEPS.md`, `ACCEPTANCE.md`, and `EXECUTION_REPORT.md`; add `phases/` only when it reduces executor context load.
-10. Run the compiler audit in `references/compiler-audit.md`. Repair every failure before handoff.
-11. When files can be created, run `python scripts/validate_execution_pack.py <package-path>`. A nonzero exit status blocks handoff.
+5. Detect executor specialization before writing environment-specific steps. If the user explicitly targets `GPT-5.3-Codex-Spark` or an unambiguous `Codex Spark` shorthand, activate `SPARK_EXECUTION_MODE` and read `references/gpt-5.3-codex-spark-profile.md`. Generic references to Codex or a lower-tier model do not activate this mode.
+6. Build the platform-independent task contract first. Then adapt it to the current execution environment using `references/environment-adaptation.md`.
+7. Decompose work into atomic steps. Every verifiable step must contain Purpose, Input, Action, Expected Result, Evidence, Verdict, and Exception Handling. Follow `references/execution-step-spec.md`.
+8. Define explicit failure branches and stop codes from `references/stop-codes.md`. An uncovered material branch must stop and escalate; the executor must not improvise.
+9. Define acceptance criteria before finalizing the package. Evidence must prove completion according to `references/evidence-policy.md`.
+10. Choose output mode:
+   - Explicit GPT-5.3-Codex-Spark target: always use the Spark chunked package defined in `references/gpt-5.3-codex-spark-profile.md` and `templates/spark/`.
+   - Other simple, linear tasks: instantiate `templates/EXECUTION_PLAN.md`.
+   - Other complex, multi-phase, multi-artifact, or stateful tasks: instantiate `templates/TASK.md`, `CONTEXT.md`, `STEPS.md`, `ACCEPTANCE.md`, and `EXECUTION_REPORT.md`; add `phases/` only when it reduces executor context load.
+11. Run the compiler audit in `references/compiler-audit.md`. Repair every failure before handoff.
+12. When files can be created, run `python scripts/validate_execution_pack.py <package-path>`. A nonzero exit status blocks handoff.
 
 ## Executor boundary
 
