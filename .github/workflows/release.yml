@@ -26,6 +26,7 @@ jobs:
           python -m unittest discover -s tests -v
           python scripts/validate_execution_pack.py examples/simple
           python scripts/validate_execution_pack.py examples/complex
+          python scripts/validate_execution_pack.py examples/spark
 
       - name: Build installable ZIP
         id: package
