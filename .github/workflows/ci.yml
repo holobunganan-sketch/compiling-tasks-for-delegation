@@ -19,6 +19,7 @@ jobs:
         run: |
           python scripts/validate_execution_pack.py examples/simple
           python scripts/validate_execution_pack.py examples/complex
+          python scripts/validate_execution_pack.py examples/spark
       - name: Check production files for unresolved placeholders
         run: |
           if grep -RniE '\b(TODO|TBD|FIXME|XXX)\b' SKILL.md agents references README.md VERSION CHANGELOG.md RELEASE_NOTES.md; then
